@@ -770,25 +770,22 @@ class BoussData(clawpack.clawutil.data.ClawData):
     def __init__(self):
         super(BoussData,self).__init__()
 
-        self.add_attribute('bouss_equations',2)
-        self.add_attribute('bouss_min_level', 1)
-        self.add_attribute('bouss_max_level', 10)
-        self.add_attribute('bouss_min_depth', 10.)
-        self.add_attribute('bouss_solver', 3)
-        self.add_attribute('bouss_tstart', 0.)
+        self.add_attribute('bouss_equations',-1)
+        self.add_attribute('bouss_min_depth',100.)
+        self.add_attribute('bouss_EDC_c_sq',100.) #Reference hyperbolic relaxation parameter
+        self.add_attribute('bouss_EDC_gamma',2.)  #Use EDC to approximate SGN (3/2) or Sainte-Marie equations (2)
+        self.add_attribute('bouss_csq_index',1) #Python index
 
     def write(self,out_file='bouss.data',data_source='setrun.py'):
 
         self.open_data_file(out_file,data_source)
-        self.data_write('bouss_equations', description='0=SWE, 1=MS, 2=SGN')
-        self.data_write('bouss_min_level',
-                        description='coarsest level to apply bouss')
-        self.data_write('bouss_max_level',
-                        description='finest level to apply bouss')
-        self.data_write('bouss_min_depth',
-                        description='depth to switch to SWE')
-        self.data_write('bouss_solver', description='1=GMRES, 2=Pardiso, 3=PETSc')
-        self.data_write('bouss_tstart', description='time to switch from SWE')
+        self.data_write('bouss_equations')
+        self.data_write('bouss_min_depth')
+        self.data_write('bouss_EDC_c_sq')
+        self.data_write('bouss_EDC_gamma')
+        self.data_write('bouss_csq_index', value=self.bouss_csq_index + 1,
+                        description=("(Index into aux array ",
+                                     "- fortran indexing)"))
 
         self.close_data_file()
 
@@ -862,6 +859,9 @@ class BoussData1D(clawpack.clawutil.data.ClawData):
 
         self.add_attribute('bouss_equations',2)
         self.add_attribute('bouss_min_depth',20.)
+        self.add_attribute('bouss_EDC_c_sq',100.) #Reference hyperbolic relaxation parameter
+        self.add_attribute('bouss_EDC_gamma',2.)  #Use EDC to approximate SGN (3/2) or Sainte-Marie equations (2)
+
 
     def write(self,out_file='bouss.data',data_source='setrun.py'):
 
@@ -869,6 +869,8 @@ class BoussData1D(clawpack.clawutil.data.ClawData):
 
         self.data_write('bouss_equations')
         self.data_write('bouss_min_depth')
+        self.data_write('bouss_EDC_c_sq')
+        self.data_write('bouss_EDC_gamma')
 
         self.close_data_file()
 
