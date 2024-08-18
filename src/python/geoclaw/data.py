@@ -782,8 +782,10 @@ class BoussData(clawpack.clawutil.data.ClawData):
         self.add_attribute('bouss_EDC_c_sq',100.) #Reference hyperbolic relaxation parameter
         self.add_attribute('bouss_EDC_gamma',2.)  #Use EDC to approximate SGN (3/2) or Sainte-Marie equations (2)
         self.add_attribute('bouss_csq_index',1) #Python index
+        self.add_attribute('bouss_decay_rate_index',2) #Python index
         self.add_attribute('bouss_transition_type', 0) #0=jump, 1=linear, 2=smooth
         self.add_attribute('bouss_start_trans_depth', 1000.) #Ignored if bouss_transition=0
+        self.add_attribute('projection_center', [0.,0.]) #Center of projection (Lat, Lon)
         ######
 
 
@@ -807,10 +809,15 @@ class BoussData(clawpack.clawutil.data.ClawData):
         self.data_write('bouss_csq_index', value=self.bouss_csq_index + 1,
                         description=("(Index into aux array ",
                                      "- fortran indexing)"))
+        self.data_write('bouss_decay_rate_index', value=self.bouss_decay_rate_index + 1,
+                        description=("(Index into aux array ",
+                                     "- fortran indexing)"))
         self.data_write('bouss_transition_type',
                         description='0=jump, 1=linear, 2=smooth')
         self.data_write('bouss_start_trans_depth',
                         description='depth to start transition')
+        self.data_write('projection_center',
+                        description='Center of projection (Lat, Lon)')
         ######
 
         self.close_data_file()
