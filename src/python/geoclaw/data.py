@@ -826,6 +826,18 @@ class BoussData(clawpack.clawutil.data.ClawData):
 
         self.close_data_file()
 
+#Define child class for Boussinesq regions
+#Regions for transition to SWEs
+from clawpack.amrclaw.data import FlagRegionData
+class BoussFlagRegionData(FlagRegionData):
+    def __init__(self,flagregions=None,num_dim=2):
+        super(BoussFlagRegionData,self).__init__(flagregions,num_dim)
+        self._out_file = 'bouss_flagregions.data'
+
+    def write(self,out_file='bouss_flagregions.data',data_source='setrun.py'):
+        #Just changin the default output file
+        super(BoussFlagRegionData,self).write(out_file,data_source)
+
 
 # ==================================
 # data objects for 1d_classic code
