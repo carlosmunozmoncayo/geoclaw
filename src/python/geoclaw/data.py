@@ -799,8 +799,6 @@ class BoussData(clawpack.clawutil.data.ClawData):
                         description='coarsest level to apply bouss')
         self.data_write('bouss_max_level',
                         description='finest level to apply bouss')
-        self.data_write('bouss_min_depth',
-                        description='depth to switch to SWE')
         self.data_write('bouss_solver', description='1=GMRES, 2=Pardiso, 3=PETSc')
         self.data_write('bouss_tstart', description='time to start solving BTEs')
         self.data_write('bouss_tfinal', description='time to turn off BTEs')
@@ -818,9 +816,9 @@ class BoussData(clawpack.clawutil.data.ClawData):
                         description='0=depth-based, 1=distance_based')
         self.data_write('bouss_transition_type_fun',
                         description='1=linear,2=tanh,...')
-        self.data_write('bouss_transition_low',
+        self.data_write('bouss_trans_low',
                         description='Below this depth/distance to regions, use SWEs')
-        self.data_write('bouss_transition_up',
+        self.data_write('bouss_trans_up',
                         description='Above this depth/distance to regions, use BTEs')
         self.data_write('projection_center',
                         description='Center of projection (Lat, Lon)')
