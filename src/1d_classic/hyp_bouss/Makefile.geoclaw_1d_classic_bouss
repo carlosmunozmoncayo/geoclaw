@@ -1,0 +1,31 @@
+#get the directory of this makefile
+#GEOLIB:=$(TEMPCLAW)/geoclaw/src/1d_classic/shallow
+#TEMPBOUSSLIB:=$(TEMPCLAW)/geoclaw/src/1d_classic/bouss
+
+#list of common sources:
+COMMON_MODULES += \
+  $(TEMPGEOLIB)/claw_module.f90 \
+  $(TEMPGEOLIB)/utility_module.f90 \
+  $(TEMPGEOLIB)/geoclaw_module.f90 \
+  $(TEMPGEOLIB)/gauges_module.f90 \
+  $(TEMPGEOLIB)/grid_module.f90 \
+  $(TEMPGEOLIB)/topo_module.f90 \
+  $(TEMPBOUSSLIB)/bouss_module.f90 \
+
+COMMON_SOURCES += \
+  $(TEMPBOUSSLIB)/claw1ez.f \
+  $(TEMPGEOLIB)/claw1.f \
+  $(TEMPBOUSSLIB)/rp1_bouss_geoclaw.f90 \
+  $(TEMPGEOLIB)/bc1.f \
+  $(TEMPGEOLIB)/setaux.f \
+  $(TEMPGEOLIB)/out1.f \
+  $(TEMPGEOLIB)/setprob.f90 \
+  $(TEMPGEOLIB)/b4step1.f90 \
+  $(TEMPGEOLIB)/qinit.f90 \
+  $(TEMPBOUSSLIB)/src1.f90 \
+  $(CLAW)/classic/src/1d/driver.f90 \
+  $(CLAW)/classic/src/1d/inlinelimiter.f90 \
+  $(CLAW)/classic/src/1d/step1.f90 \
+  $(CLAW)/classic/src/1d/copyq1.f \
+  $(CLAW)/classic/src/1d/opendatafile.f \
+  $(CLAW)/riemann/src/geoclaw_riemann_utils.f \
