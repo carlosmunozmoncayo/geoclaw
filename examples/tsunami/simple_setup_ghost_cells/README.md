@@ -1,0 +1,3 @@
+#### A simple example to illustrate how the aux array at patch ghost cells is not copied from interior cells of neighboring patches by default.
+A single step is taken in a small portion of the domain, and a dummy aux array is set up for the interior cells only in setaux.f90. This does not happen if one sets do_aux_copy = .true. in the bound routine, like in the local bound.f90 file.
+The differences in the aux array between interior and ghost cells are visualized in the notebook diffing_debug_logs.ipynb.
