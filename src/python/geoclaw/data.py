@@ -9,13 +9,13 @@ Classes representing parameters for GeoClaw runs
  - GeoClawData
  - RefinementData
  - TopographyData
- - FixedGridData
+ - FGoutData
  - FGmaxData
  - DTopoData
  - QinitData
  - SurgeData
  - MultilayerData
- - FrictionData 
+ - FrictionData
  - BoussData
  - GridData1D
  - BoussData1D
@@ -28,21 +28,20 @@ Classes representing parameters for GeoClaw runs
  - LAT2METER factor to convert degrees in latitude to meters
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
 import os
-import numpy
-import clawpack.clawutil.data
+from pathlib import Path
+import numpy as np
 import warnings
 
+import clawpack.clawutil.data
 
 # Radius of earth in meters.
 # For consistency, should always use this value when needed, e.g.
 # in setrun.py or topotools:
 Rearth = 6367.5e3  # average of polar and equatorial radii
 
-DEG2RAD = numpy.pi / 180.0
-RAD2DEG = 180.0 / numpy.pi
+DEG2RAD = np.pi / 180.0
+RAD2DEG = 180.0 / np.pi
 LAT2METER = Rearth * DEG2RAD
 
 class GeoClawData(clawpack.clawutil.data.ClawData):
@@ -72,6 +71,7 @@ class GeoClawData(clawpack.clawutil.data.ClawData):
         self.add_attribute('dry_tolerance',1e-3)
         self.add_attribute('friction_depth',1.0e6)
         self.add_attribute('sea_level',0.0)
+        self.add_attribute('speed_limit',50.)
 
 
     def write(self,data_source='setrun.py', out_file='geoclaw.data'):
@@ -111,6 +111,7 @@ class GeoClawData(clawpack.clawutil.data.ClawData):
         self.data_write()
 
         self.data_write('dry_tolerance')
+        self.data_write('speed_limit')
 
         self.close_data_file()
 
@@ -124,7 +125,7 @@ class RefinementData(clawpack.clawutil.data.ClawData):
 
         # Refinement controls
         self.add_attribute('wave_tolerance',1.0e-1)
-        self.add_attribute('speed_tolerance',[1.0e12]*6)
+        self.add_attribute('speed_tolerance', None)
         self.add_attribute('deep_depth',None)      # deprecated
         self.add_attribute('max_level_deep',None)  # deprecated
         self.add_attribute('variable_dt_refinement_ratios',False)
@@ -143,7 +144,7 @@ class RefinementData(clawpack.clawutil.data.ClawData):
             w = '\n  *** WARNING: max_level_deep parameter ignored as of v5.8.0'
             warnings.warn(w, UserWarning)
 
-        if not isinstance(self.speed_tolerance,list):
+        if isinstance(self.speed_tolerance, float):
             self.speed_tolerance = [self.speed_tolerance]
         self.data_write('speed_tolerance')
         self.data_write()
@@ -160,9 +161,10 @@ class TopographyData(clawpack.clawutil.data.ClawData):
         super(TopographyData,self).__init__()
 
         # Topography data
-        self.add_attribute('topo_missing',99999.)
-        self.add_attribute('test_topography',0)
-        self.add_attribute('topofiles',[])
+        self.add_attribute('topo_missing', 99999.0)
+        self.add_attribute('test_topography', 0)
+        self.add_attribute('override_order', False)
+        self.add_attribute('topofiles', [])
 
         # Jump discontinuity
         self.add_attribute('topo_location',-50e3)
@@ -188,6 +190,7 @@ class TopographyData(clawpack.clawutil.data.ClawData):
         if self.test_topography == 0:
             ntopofiles = len(self.topofiles)
             self.data_write(value=ntopofiles,alt_name='ntopofiles')
+            self.data_write(name="override_order", description="(Override order topo files are used)")
             for tfile in self.topofiles:
 
                 if len(tfile) == 6:
@@ -358,16 +361,16 @@ class FGmaxData(clawpack.clawutil.data.ClawData):
                         self.num_fgmax_val = int(value)
                     elif varname == "num_fgmax_grids":
                         num_fgmax_grids = int(value)
-                
+
                 # Contains a fixed grid number
                 elif "# fgno" in line:
                     value, tail = line.split("#")
                     fig_numbers.append(int(value))
 
         if len(fig_numbers) != num_fgmax_grids:
-            raise ValueError("Number of FGMaxGrid numbers found does not ", 
+            raise ValueError("Number of FGMaxGrid numbers found does not ",
                              "equal the number of grids recorded.")
-        
+
         # Read each fgmax grid
         import clawpack.geoclaw.fgmax_tools
         for (i, grid_num) in enumerate(fig_numbers):
@@ -536,19 +539,19 @@ class SurgeData(clawpack.clawutil.data.ClawData):
     r"""Data object describing storm surge related parameters"""
 
     # Provide some mapping between model names and integers
-    storm_spec_dict_mapping = {"HWRF":-1,
+    storm_spec_dict_mapping = {"data": -1,
                                None: 0,
                                'holland80': 1,
                                'holland08': 8,
                                'holland10': 2,
-                               'CLE': 3,
-                               'SLOSH': 4,
+                               'cle': 3,
+                               'slosh': 4,
                                'rankine': 5,
                                'modified-rankine': 6,
                                'DeMaria': 7,
                                'willoughby': 9,
                               }
-    storm_spec_not_implemented = ['CLE', 'willoughby']
+    storm_spec_not_implemented = ['CLE']
 
     def __init__(self):
         super(SurgeData, self).__init__()
@@ -566,12 +569,48 @@ class SurgeData(clawpack.clawutil.data.ClawData):
 
         # AMR parameters
         self.add_attribute('wind_refine', [20.0,40.0,60.0])
-        self.add_attribute('R_refine', [60.0e3,40e3,20e3])
+        self.add_attribute('R_refine', [60.0e3, 40e3, 20e3])
 
         # Storm parameters
         self.add_attribute('storm_type', None)  # Backwards compatibility
         self.add_attribute('storm_specification_type', 0) # Type of parameterized storm
-        self.add_attribute("storm_file", None) # File(s) containing data
+        self.add_attribute("storm_file", None) # File containing data
+
+    def read(self, path: Path=Path("surge.data"), force: bool=False):
+        """Read surge data file"""
+
+        with Path(path).open() as data_file:
+            # Header
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+
+            self.wind_forcing = bool(data_file.readline())
+            self.drag_law = int(data_file.readline().split("=:")[0])
+            self.pressure_forcing = bool(data_file.readline().split("=:")[0])
+            self.rotation_override = data_file.readline().split("=:")[0]
+            data_file.readline()
+
+            self.wind_index = int(data_file.readline().split("=:")[0]) - 1
+            self.pressure_index = int(data_file.readline().split("=:")[0]) - 1
+            self.display_landfall_time = bool(data_file.readline().split("=:")[0])
+            data_file.readline()
+
+            # AMR parameters
+            self.wind_refine = self._parse_value(data_file.readline())
+            self.R_refine = self._parse_value(data_file.readline())
+            data_file.readline()
+
+            # Storm specification
+            self.storm_specification_type = int(data_file.readline().split("=:")[0])
+            line = data_file.readline().split("=:")[0]
+            if line[0] == "'":
+                self.storm_file = line.strip()[1:-1]
+            else:
+                raise IOError("Error reading storm file name.")
 
 
     def write(self, out_file='surge.data', data_source="setrun.py"):
@@ -595,7 +634,7 @@ class SurgeData(clawpack.clawutil.data.ClawData):
                 raise ValueError("Unknown rotation_override specification.")
         else:
             self.rotation_override = int(self.rotation_override)
-        self.data_write('rotation_override', 
+        self.data_write('rotation_override',
                         description="(Override storm rotation)")
         self.data_write()
 
@@ -607,49 +646,46 @@ class SurgeData(clawpack.clawutil.data.ClawData):
                         description='(Display time relative to landfall)')
         self.data_write()
 
+        # AMR storm refinement criteria
+        # Handle older style of refinement for turning it off, F -> None
         if isinstance(self.wind_refine, bool):
             if not self.wind_refine:
-                self.data_write('wind_refine', value=False,
-                                description='(Refinement ratios)')
-        elif isinstance(self.wind_refine, type(None)):
-            self.data_write('wind_refine', value=False,
-                            description='(Refinement ratios)')
-        else:
-            self.data_write('wind_refine',description='(Refinement ratios)')
+                self.wind_refine = None
         if isinstance(self.R_refine, bool):
             if not self.R_refine:
-                self.data_write('R_refine', value=False,
-                                description='(Refinement ratios)')
-        elif isinstance(self.R_refine, type(None)):
-            self.data_write('R_refine', value=False,
-                            description='(Refinement ratios)')
-        else:
-            self.data_write('R_refine', description='(Refinement ratios)')
+                self.R_refine = None
         self.data_write()
+        
+        if isinstance(self.wind_refine, float):
+            self.wind_refine = [self.wind_refine]
+        self.data_write('wind_refine', description='(Wind speed refinement criteria)')
+        if isinstance(self.R_refine, float):
+            self.R_refine = [self.R_refine]
+        self.data_write('R_refine', description='(Wind speed refinement criteria)')
 
         # Storm specification
+        # Handle deprecated member value
         if self.storm_type is not None:
             self.storm_specification_type = self.storm_type
-        if type(self.storm_specification_type) is not int:
-            if self.storm_specification_type in         \
-                    self.storm_spec_dict_mapping.keys():
-                if self.storm_specification_type in     \
-                    self.storm_spec_not_implemented:
-                    raise NotImplementedError("%s has not been implemented."
-                                %self.storm_specification_type)
-
-                else:
-                    self.data_write("storm_specification_type",
-                                self.storm_spec_dict_mapping[
-                                        self.storm_specification_type],
-                                description="(Storm specification)")
+        # Turn value into integer descriptor
+        if isinstance(self.storm_specification_type, int):
+            spec_type = self.storm_specification_type
+        elif isinstance(self.storm_specification_type, str):
+            if self.storm_specification_type.lower() in self.storm_spec_dict_mapping.keys():
+                spec_type = self.storm_spec_dict_mapping[self.storm_specification_type.lower()]
             else:
-                raise ValueError("Unknown storm specification type %s"
-                                 % self.storm_specification_type)
+                raise TypeError(f"Unknown storm specification type" +
+                                f" '{self.storm_specification_type}' provided.")
         else:
-            self.data_write("storm_specification_type",
-                            description="(Storm specification)")
-        self.data_write("storm_file", description='(Path to storm data)')
+            raise TypeError(f"Unknown storm specification type" +
+                            f" '{self.storm_specification_type}' provided.")
+        # Check to see if spec type is in supported formats
+        if spec_type in self.storm_spec_not_implemented:
+            raise NotImplementedError(f"'{spec_type}' has not been implemented.")
+        # Write out values
+        self.data_write(name="storm_specification_type", value=spec_type,
+                        description="(Storm specification)")
+        self.data_write(name="storm_file", description='(Path to storm data)')
 
         self.close_data_file()
 
@@ -673,6 +709,37 @@ class FrictionData(clawpack.clawutil.data.ClawData):
 
         # File support
         self.add_attribute('friction_files', [])
+
+
+    def read(self, path="friction.data", force=False):
+        r"""Read friction data file"""
+
+        with open(os.path.abspath(path), 'r') as data_file:
+            # Header
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+            data_file.readline()
+
+            # Generic data
+            self.variable_friction = bool(data_file.readline().split("=:")[0])
+            self.friction_index = int(data_file.readline().split("=:")[0])
+            data_file.readline()
+            num_regions = int(data_file.readline().split("=:")[0])
+            data_file.readline()
+            # Regions
+            self.friction_regions = []
+            for n in range(num_regions):
+                lower = self._parse_value(data_file.readline())
+                upper = self._parse_value(data_file.readline())
+                depths = self._parse_value(data_file.readline())
+                coeff = self._parse_value(data_file.readline())
+                self.friction_regions.append([lower, upper, depths, coeff])
+                data_file.readline()
+            self.friction_files = [] # Is not supported
+
 
     def write(self, out_file='friction.data', data_source='setrun.py'):
 
@@ -704,7 +771,8 @@ class FrictionData(clawpack.clawutil.data.ClawData):
             for friction_file in self.friction_files:
                 # if path is relative in setrun, assume it's relative to the
                 # same directory that out_file comes from
-                fname = os.path.abspath(os.path.join(os.path.dirname(out_file),friction_file))
+                fname = os.path.abspath(os.path.join(os.path.dirname(out_file),
+                                                     friction_file))
                 self._out_file.write("'%s' %s\n " % fname)
 
         self.close_data_file()
@@ -773,6 +841,7 @@ class BoussData(clawpack.clawutil.data.ClawData):
         self.add_attribute('bouss_equations',-1)  #Hyperbolic relaxation by default
         self.add_attribute('bouss_min_level', 1)
         self.add_attribute('bouss_max_level', 10)
+        self.add_attribute('bouss_min_depth', 10.)
         self.add_attribute('bouss_solver', 3)
         self.add_attribute('bouss_tstart', 0.)
         self.add_attribute('bouss_tfinal', 1.e9)
@@ -799,30 +868,34 @@ class BoussData(clawpack.clawutil.data.ClawData):
                         description='coarsest level to apply bouss')
         self.data_write('bouss_max_level',
                         description='finest level to apply bouss')
+        if self.bouss_equations > 0:
+            self.data_write('bouss_min_depth',
+                            description='depth to switch to SWE')
         self.data_write('bouss_solver', description='1=GMRES, 2=Pardiso, 3=PETSc')
         self.data_write('bouss_tstart', description='time to start solving BTEs')
-        self.data_write('bouss_tfinal', description='time to turn off BTEs')
-        ######
-        # Data for hyperbolic relaxation
-        self.data_write('bouss_EDC_c_sq', description='Reference hyperbolic relaxation parameter')
-        self.data_write('bouss_EDC_gamma', description='Use EDC to approximate SGN (3/2) or Sainte-Marie equations (2)')
-        self.data_write('bouss_csq_index', value=self.bouss_csq_index + 1,
-                        description=("(Index into aux array ",
-                                     "- fortran indexing)"))
-        self.data_write('bouss_decay_rate_index', value=self.bouss_decay_rate_index + 1,
-                        description=("(Index into aux array ",
-                                     "- fortran indexing)"))
-        self.data_write('bouss_transition_type',
-                        description='0=depth-based, 1=distance_based')
-        self.data_write('bouss_transition_type_fun',
-                        description='1=linear,2=tanh,...')
-        self.data_write('bouss_trans_low',
-                        description='Below this depth/distance to regions, use SWEs')
-        self.data_write('bouss_trans_up',
-                        description='Above this depth/distance to regions, use BTEs')
-        self.data_write('projection_center',
-                        description='Center of projection (Lat, Lon)')
-        ######
+        if self.bouss_equations <= 0:
+            ######
+            # Data for hyperbolic relaxation
+            self.data_write('bouss_tfinal', description='time to turn off BTEs')
+            self.data_write('bouss_EDC_c_sq', description='Reference hyperbolic relaxation parameter')
+            self.data_write('bouss_EDC_gamma', description='Use EDC to approximate SGN (3/2) or Sainte-Marie equations (2)')
+            self.data_write('bouss_csq_index', value=self.bouss_csq_index + 1,
+                            description=("(Index into aux array ",
+                                        "- fortran indexing)"))
+            self.data_write('bouss_decay_rate_index', value=self.bouss_decay_rate_index + 1,
+                            description=("(Index into aux array ",
+                                        "- fortran indexing)"))
+            self.data_write('bouss_transition_type',
+                            description='0=depth-based, 1=distance_based')
+            self.data_write('bouss_transition_type_fun',
+                            description='1=linear,2=tanh,...')
+            self.data_write('bouss_trans_low',
+                            description='Below this depth/distance to regions, use SWEs')
+            self.data_write('bouss_trans_up',
+                            description='Above this depth/distance to regions, use BTEs')
+            self.data_write('projection_center',
+                            description='Center of projection (Lat, Lon)')
+            ######
 
         self.close_data_file()
 
